@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.veil.gradle.plugins.jetty7.internal;
+package org.veil.gradle.plugins.jetty9.internal;
 
 /**
  * Proxy

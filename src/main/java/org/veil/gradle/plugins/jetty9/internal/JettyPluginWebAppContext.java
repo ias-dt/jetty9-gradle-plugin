@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.veil.gradle.plugins.jetty7.internal;
+package org.veil.gradle.plugins.jetty9.internal;
 
 import org.eclipse.jetty.webapp.StandardDescriptorProcessor;
 import org.eclipse.jetty.webapp.WebAppClassLoader;
@@ -26,10 +26,10 @@ import java.util.List;
 
 
 /**
- * Jetty7PluginWebAppContext
+ * Jetty9PluginWebAppContext
  */
 public class JettyPluginWebAppContext extends WebAppContext {
-    private List classpathFiles;
+    private List<File> classpathFiles;
     private File jettyEnvXmlFile;
     private File webXmlFile;
 
@@ -37,11 +37,11 @@ public class JettyPluginWebAppContext extends WebAppContext {
         super();
     }
 
-    public void setClassPathFiles(List classpathFiles) {
+    public void setClassPathFiles(List<File> classpathFiles) {
         this.classpathFiles = classpathFiles;
     }
 
-    public List getClassPathFiles() {
+    public List<File> getClassPathFiles() {
         return this.classpathFiles;
     }
 
@@ -72,11 +72,10 @@ public class JettyPluginWebAppContext extends WebAppContext {
 
         super.configure();
     }
+	
     public void preConfigure() throws Exception{
         super.preConfigure();
         configureWebAppClasspath();
-//        getMetaData().addDescriptorProcessor(new StandardDescriptorProcessor());
-
     }
 
     private void configureWebAppClasspath() throws IOException {
@@ -87,13 +86,8 @@ public class JettyPluginWebAppContext extends WebAppContext {
         }
     }
 
-    public void doStart() throws Exception {
-        setShutdown(false);
-        super.doStart();
-    }
-
     public void doStop() throws Exception {
-        setShutdown(true);
+        shutdown();
         //just wait a little while to ensure no requests are still being processed
         Thread.sleep(500L);
         super.doStop();

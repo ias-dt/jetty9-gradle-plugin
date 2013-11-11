@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package org.veil.gradle.plugins.jetty7;
+package org.veil.gradle.plugins.jetty9;
 
+import com.google.common.collect.Sets;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.ContextHandler;
@@ -34,8 +35,8 @@ import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.veil.gradle.plugins.jetty7.internal.Jetty7PluginServer;
-import org.veil.gradle.plugins.jetty7.internal.JettyPluginServer;
+import org.veil.gradle.plugins.jetty9.internal.Jetty9PluginServer;
+import org.veil.gradle.plugins.jetty9.internal.JettyPluginServer;
 
 import java.io.File;
 import java.io.IOException;
@@ -52,8 +53,6 @@ import java.util.Set;
  * automatically performing a hot redeploy when necessary. This allows the developer to concentrate on coding changes to
  * the project using their IDE of choice and have those changes immediately and transparently reflected in the running
  * web container, eliminating development time that is wasted on rebuilding, reassembling and redeploying. </p>
- *
- * @author janb
  */
 public class JettyRun extends AbstractJettyRunTask {
     private static Logger logger = LoggerFactory.getLogger(JettyRun.class);
@@ -74,7 +73,7 @@ public class JettyRun extends AbstractJettyRunTask {
     private File webXml;
 
     /**
-     * Root directory for all html/jsp etc files.
+     * Root directory for all HTML/JSP etc files.
      */
     private File webAppSourceDirectory;
 
@@ -102,7 +101,7 @@ public class JettyRun extends AbstractJettyRunTask {
     /**
      * Extra scan targets as a list.
      */
-    private List<File> extraScanTargets;
+    private Set<File> extraScanTargets;
 
     private FileCollection classpath;
 
@@ -161,11 +160,11 @@ public class JettyRun extends AbstractJettyRunTask {
                 ConfigurableFileTree files = getProject().fileTree(scanTargetPattern.getDirectory());
                 files.include(scanTargetPattern.getIncludes());
                 files.exclude(scanTargetPattern.getExcludes());
-                List<File> currentTargets = getExtraScanTargets();
+                Set<File> currentTargets = getExtraScanTargets();
                 if (currentTargets != null && !currentTargets.isEmpty()) {
                     currentTargets.addAll(files.getFiles());
                 } else {
-                    setExtraScanTargets((List) files.asType(List.class));
+                    setExtraScanTargets(files.getFiles());
                 }
             }
         }
@@ -187,8 +186,6 @@ public class JettyRun extends AbstractJettyRunTask {
             getWebAppConfig().setWar(getWebAppSourceDirectory().getCanonicalPath());
         }
         logger.info("Webapp directory = " + getWebAppSourceDirectory().getCanonicalPath());
-
-//        getWebAppConfig().configure();
     }
 
     public void configureScanner() {
@@ -206,7 +203,7 @@ public class JettyRun extends AbstractJettyRunTask {
         scanList.add(getProject().getBuildFile());
         scanList.addAll(getClassPathFiles());
         getScanner().setScanDirs(scanList);
-        ArrayList listeners = new ArrayList();
+        List<Scanner.Listener> listeners = new ArrayList<Scanner.Listener>();
         listeners.add(new Scanner.BulkListener() {
             public void filesChanged(List changes) {
                 try {
@@ -355,7 +352,7 @@ public class JettyRun extends AbstractJettyRunTask {
     }
 
     public JettyPluginServer createServer() {
-        return new Jetty7PluginServer();
+        return new Jetty9PluginServer();
     }
 
     @InputFile
@@ -399,12 +396,12 @@ public class JettyRun extends AbstractJettyRunTask {
         this.scanTargets = scanTargets;
     }
 
-    public List<File> getExtraScanTargets() {
+    public Set<File> getExtraScanTargets() {
         return extraScanTargets;
     }
 
-    public void setExtraScanTargets(List<File> extraScanTargets) {
-        this.extraScanTargets = extraScanTargets;
+    public void setExtraScanTargets(Iterable<File> extraScanTargets) {
+        this.extraScanTargets = Sets.newLinkedHashSet(extraScanTargets);
     }
 
     @InputFile

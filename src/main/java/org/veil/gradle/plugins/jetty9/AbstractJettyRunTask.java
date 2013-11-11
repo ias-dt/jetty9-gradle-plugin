@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.veil.gradle.plugins.jetty7;
+package org.veil.gradle.plugins.jetty9;
 
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.RequestLog;
@@ -26,13 +26,15 @@ import org.gradle.api.tasks.InputFile;
 import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.TaskAction;
-import org.gradle.util.GFileUtils;
+import org.gradle.internal.classpath.DefaultClassPath;
+import org.gradle.logging.ProgressLogger;
+import org.gradle.logging.ProgressLoggerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.veil.gradle.plugins.jetty7.internal.ConsoleScanner;
-import org.veil.gradle.plugins.jetty7.internal.JettyPluginServer;
-import org.veil.gradle.plugins.jetty7.internal.JettyPluginWebAppContext;
-import org.veil.gradle.plugins.jetty7.internal.Monitor;
+import org.veil.gradle.plugins.jetty9.internal.ConsoleScanner;
+import org.veil.gradle.plugins.jetty9.internal.JettyPluginServer;
+import org.veil.gradle.plugins.jetty9.internal.JettyPluginWebAppContext;
+import org.veil.gradle.plugins.jetty9.internal.Monitor;
 
 import java.io.File;
 import java.net.URLClassLoader;
@@ -72,8 +74,7 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
     private File webDefaultXml;
 
     /**
-     * A web.xml file to be applied AFTER the webapp's web.xml file. Useful for applying different build profiles, eg
-     * test, production etc. Optional.
+     * A web.xml file to be applied AFTER the webapp's web.xml file. Useful for applying different build profiles, eg test, production etc. Optional.
      */
     private File overrideWebXml;
 
@@ -90,8 +91,7 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
     protected String reload;
 
     /**
-     * Location of a jetty xml configuration file whose contents will be applied before any plugin configuration.
-     * Optional.
+     * Location of a jetty XML configuration file whose contents will be applied before any plugin configuration. Optional.
      */
     private File jettyConfig;
 
@@ -106,11 +106,9 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
     private String stopKey;
 
     /**
-     * <p> Determines whether or not the server blocks when started. The default behavior (daemon = false) will cause
-     * the server to pause other processes while it continues to handle web requests. This is useful when starting the
-     * server with the intent to work with it interactively. </p><p> Often, it is desirable to let the server start and
-     * continue running subsequent processes in an automated build environment. This can be facilitated by setting
-     * daemon to true. </p>
+     * <p> Determines whether or not the server blocks when started. The default behavior (daemon = false) will cause the server to pause other processes while it continues to handle web requests.
+     * This is useful when starting the server with the intent to work with it interactively. </p><p> Often, it is desirable to let the server start and continue running subsequent processes in an
+     * automated build environment. This can be facilitated by setting daemon to true. </p>
      */
     private boolean daemon;
 
@@ -134,7 +132,7 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
     /**
      * List of Listeners for the scanner.
      */
-    protected ArrayList scannerListeners;
+    protected List<Scanner.Listener> scannerListeners;
 
     /**
      * A scanner to check ENTER hits on the console.
@@ -165,7 +163,7 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
         for (File additionalRuntimeJar : getAdditionalRuntimeJars()) {
             additionalClasspath.add(additionalRuntimeJar);
         }
-        URLClassLoader jettyClassloader = new URLClassLoader(GFileUtils.toURLArray(additionalClasspath), originalClassloader);
+        URLClassLoader jettyClassloader = new URLClassLoader(new DefaultClassPath(additionalClasspath).getAsURLArray(), originalClassloader);
         try {
             Thread.currentThread().setContextClassLoader(jettyClassloader);
             startJetty();
@@ -182,11 +180,11 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
         this.server = server;
     }
 
-    public void setScannerListeners(ArrayList listeners) {
-        this.scannerListeners = new ArrayList(listeners);
+    public void setScannerListeners(List<Scanner.Listener> listeners) {
+        this.scannerListeners = new ArrayList<Scanner.Listener>(listeners);
     }
 
-    public ArrayList getScannerListeners() {
+    public List<Scanner.Listener> getScannerListeners() {
         return this.scannerListeners;
     }
 
@@ -201,9 +199,12 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
     }
 
     public void startJettyInternal() {
+        ProgressLoggerFactory progressLoggerFactory = getServices().get(ProgressLoggerFactory.class);
+        ProgressLogger progressLogger = progressLoggerFactory.newOperation(AbstractJettyRunTask.class);
+        progressLogger.setDescription("Start Jetty server");
+        progressLogger.setShortDescription("Starting Jetty");
+        progressLogger.started();
         try {
-            logger.debug("Starting Jetty Server ...");
-
             setServer(createServer());
 
             applyJettyXml();
@@ -237,11 +238,12 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
             // start Jetty
             server.start();
 
-            logger.info("Started Jetty Server");
+            if (daemon) {
+                return;
+            }
 
             if (getStopPort() != null && getStopPort() > 0 && getStopKey() != null) {
-                Monitor monitor = new Monitor(getStopPort(), getStopKey(),
-                        new Server[]{(Server) server.getProxiedObject()}, !daemon);
+                Monitor monitor = new Monitor(getStopPort(), getStopKey(), (Server) server.getProxiedObject());
                 monitor.start();
             }
 
@@ -252,16 +254,23 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
             // start the new line scanner thread if necessary
             startConsoleScanner();
 
-            // keep the thread going if not in daemon mode
-            if (!daemon) {
-                server.join();
-            }
         } catch (Exception e) {
-            throw new GradleException("An error occurred starting the Jetty server.", e);
+            throw new GradleException("Could not start the Jetty server.", e);
         } finally {
-            if (!daemon) {
-                logger.info("Jetty server exiting.");
-            }
+            progressLogger.completed();
+        }
+
+        progressLogger = progressLoggerFactory.newOperation(AbstractJettyRunTask.class);
+        progressLogger.setDescription(String.format("Run Jetty at http://localhost:%d/%s", getHttpPort(), getContextPath()));
+        progressLogger.setShortDescription(String.format("Running at http://localhost:%d/%s", getHttpPort(), getContextPath()));
+        progressLogger.started();
+        try {
+            // keep the thread going if not in daemon mode
+            server.join();
+        } catch (Exception e) {
+            throw new GradleException("Failed to wait for the Jetty server to stop.", e);
+        } finally {
+            progressLogger.completed();
         }
     }
 
@@ -304,10 +313,9 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
     }
 
     /**
-     * Run a scanner thread on the given list of files and directories, calling stop/start on the given list of
-     * LifeCycle objects if any of the watched files change.
+     * Run a scanner thread on the given list of files and directories, calling stop/start on the given list of LifeCycle objects if any of the watched files change.
      */
-    private void startScanner() {
+    private void startScanner() throws Exception {
 
         // check if scanning is enabled
         if (getScanIntervalSeconds() <= 0) {
@@ -397,10 +405,22 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
         this.overrideWebXml = overrideWebXml;
     }
 
+    /**
+     * Returns the interval in seconds between scanning the web app for file changes.
+     * If file changes are detected, the web app is reloaded. Only relevant
+     * if {@code reload} is set to {@code "automatic"}. Defaults to {@code 0},
+     * which <em>disables</em> automatic reloading.
+     */
     public int getScanIntervalSeconds() {
         return scanIntervalSeconds;
     }
 
+    /**
+     * Sets the interval in seconds between scanning the web app for file changes.
+     * If file changes are detected, the web app is reloaded. Only relevant
+     * if {@code reload} is set to {@code "automatic"}. Defaults to {@code 0},
+     * which <em>disables</em> automatic reloading.
+     */
     public void setScanIntervalSeconds(int scanIntervalSeconds) {
         this.scanIntervalSeconds = scanIntervalSeconds;
     }
@@ -424,10 +444,30 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
         this.webAppConfig = webAppConfig;
     }
 
+    /**
+     * Returns the reload mode, which is either {@code "automatic"} or {@code "manual"}.
+     *
+     * <p>In automatic mode, the web app is scanned for file changes every n seconds, where n is
+     * determined by the {@code scanIntervalSeconds} property. (Note that {@code scanIntervalSeconds}
+     * defaults to {@code 0}, which <em>disables</em> automatic reloading.) If files changes are
+     * detected, the web app is reloaded.
+     *
+     * <p>In manual mode, the web app is reloaded whenever the Enter key is pressed.
+     */
     public String getReload() {
         return reload;
     }
 
+    /**
+     * Sets the reload mode, which is either {@code "automatic"} or {@code "manual"}.
+     *
+     * <p>In automatic mode, the web app is scanned for file changes every n seconds, where n is
+     * determined by the {@code scanIntervalSeconds} property. (Note that {@code scanIntervalSeconds}
+     * defaults to {@code 0}, which <em>disables</em> automatic reloading.) If files changes are
+     * detected, the web app is reloaded.
+     *
+     * <p>In manual mode, the web app is reloaded whenever the Enter key is pressed.
+     */
     public void setReload(String reload) {
         this.reload = reload;
     }
@@ -468,8 +508,8 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
     }
 
     /**
-     * Specifies whether the Jetty server should run in the background. When {@code true}, this task completes as
-     * soon as the server has started. When {@code false}, this task blocks until the Jetty server is stopped.
+     * Specifies whether the Jetty server should run in the background. When {@code true}, this task completes as soon as the server has started. When {@code false}, this task blocks until the Jetty
+     * server is stopped.
      */
     public boolean isDaemon() {
         return daemon;
@@ -495,17 +535,6 @@ public abstract class AbstractJettyRunTask extends ConventionTask {
     }
 
     public void setConnectors(Connector[] connectors) {
-//    	Connector[] conns = new Connector[connectors.length];
-//    	for (int i = 0; i < connectors.length; i++) {
-//    		Object o = connectors[i];
-//    		System.out.println(o.getClass());
-//    		System.out.println(this.getClass().getClassLoader());
-//    		System.out.println(o instanceof Connector);
-//    		for (Class clazz : o.getClass().getInterfaces()) {
-//    			System.out.println("\t" + clazz);
-//    		}
-//    		conns[i] = (Connector)o;
-//    	}
         this.connectors = connectors;
     }
 

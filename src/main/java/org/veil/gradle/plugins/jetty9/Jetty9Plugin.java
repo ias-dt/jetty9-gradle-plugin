@@ -13,36 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.veil.gradle.plugins.jetty7;
+package org.veil.gradle.plugins.jetty9;
 
 import org.gradle.api.Action;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
-import org.gradle.api.internal.IConventionAware;
 import org.gradle.api.plugins.Convention;
 import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.plugins.WarPlugin;
 import org.gradle.api.plugins.WarPluginConvention;
-import org.gradle.api.tasks.ConventionValue;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.bundling.War;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.Properties;
-
-import javax.naming.Context;
+import java.util.concurrent.Callable;
 
 /**
  * <p>A {@link Plugin} which extends the {@link WarPlugin} to add tasks which run the web application using an embedded
  * Jetty web container.</p>
- *
- * @author Hans Dockter
  */
-public class Jetty7Plugin implements Plugin<Project> {
-    public static final String JETTY_RUN = "jetty7Run";
-    public static final String JETTY_RUN_WAR = "jetty7RunWar";
-    public static final String JETTY_STOP = "jetty7Stop";
+public class Jetty9Plugin implements Plugin<Project> {
+    public static final String JETTY_RUN = "jetty9Run";
+    public static final String JETTY_RUN_WAR = "jetty9RunWar";
+    public static final String JETTY_STOP = "jetty9Stop";
 
     public static final String RELOAD_AUTOMATIC = "automatic";
     public static final String RELOAD_MANUAL = "manual";
@@ -51,7 +44,7 @@ public class Jetty7Plugin implements Plugin<Project> {
         project.getPlugins().apply(WarPlugin.class);
         JettyPluginConvention jettyConvention = new JettyPluginConvention();
         Convention convention = project.getConvention();
-        convention.getPlugins().put("jetty7", jettyConvention);
+        convention.getPlugins().put("jetty9", jettyConvention);
 
         configureMappingRules(project, jettyConvention);
         configureJettyRun(project);
@@ -71,30 +64,30 @@ public class Jetty7Plugin implements Plugin<Project> {
         project.getTasks().withType(JettyRunWar.class, new Action<JettyRunWar>() {
             public void execute(JettyRunWar jettyRunWar) {
                 jettyRunWar.dependsOn(WarPlugin.WAR_TASK_NAME);
-                jettyRunWar.getConventionMapping().map("webApp", new ConventionValue() {
-                    public Object getValue(Convention convention, IConventionAware conventionAwareObject) {
+                jettyRunWar.getConventionMapping().map("webApp", new Callable<Object>() {
+                    public Object call() throws Exception {
                         return ((War) project.getTasks().getByName(WarPlugin.WAR_TASK_NAME)).getArchivePath();
                     }
                 });
             }
         });
 
-        JettyRunWar jettyRunWar = project.getTasks().add(JETTY_RUN_WAR, JettyRunWar.class);
+        JettyRunWar jettyRunWar = project.getTasks().create(JETTY_RUN_WAR, JettyRunWar.class);
         jettyRunWar.setDescription("Assembles the webapp into a war and deploys it to Jetty.");
         jettyRunWar.setGroup(WarPlugin.WEB_APP_GROUP);
     }
 
     private void configureJettyStop(Project project, final JettyPluginConvention jettyConvention) {
-        JettyStop jettyStop = project.getTasks().add(JETTY_STOP, JettyStop.class);
+        JettyStop jettyStop = project.getTasks().create(JETTY_STOP, JettyStop.class);
         jettyStop.setDescription("Stops Jetty.");
         jettyStop.setGroup(WarPlugin.WEB_APP_GROUP);
-        jettyStop.getConventionMapping().map("stopPort", new ConventionValue() {
-            public Object getValue(Convention convention, IConventionAware conventionAwareObject) {
+        jettyStop.getConventionMapping().map("stopPort", new Callable<Object>() {
+            public Object call() throws Exception {
                 return jettyConvention.getStopPort();
             }
         });
-        jettyStop.getConventionMapping().map("stopKey", new ConventionValue() {
-            public Object getValue(Convention convention, IConventionAware conventionAwareObject) {
+        jettyStop.getConventionMapping().map("stopKey", new Callable<Object>() {
+            public Object call() throws Exception {
                 return jettyConvention.getStopKey();
             }
         });
@@ -103,25 +96,25 @@ public class Jetty7Plugin implements Plugin<Project> {
     private void configureJettyRun(final Project project) {
         project.getTasks().withType(JettyRun.class, new Action<JettyRun>() {
             public void execute(JettyRun jettyRun) {
-                jettyRun.getConventionMapping().map("webXml", new ConventionValue() {
-                    public Object getValue(Convention convention, IConventionAware conventionAwareObject) {
+                jettyRun.getConventionMapping().map("webXml", new Callable<Object>() {
+                    public Object call() throws Exception {
                         return getWebXml(project);
                     }
                 });
-                jettyRun.getConventionMapping().map("classpath", new ConventionValue() {
-                    public Object getValue(Convention convention, IConventionAware conventionAwareObject) {
+                jettyRun.getConventionMapping().map("classpath", new Callable<Object>() {
+                    public Object call() throws Exception {
                         return getJavaConvention(project).getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME).getRuntimeClasspath();
                     }
                 });
-                jettyRun.getConventionMapping().map("webAppSourceDirectory", new ConventionValue() {
-                    public Object getValue(Convention convention, IConventionAware conventionAwareObject) {
+                jettyRun.getConventionMapping().map("webAppSourceDirectory", new Callable<Object>() {
+                    public Object call() throws Exception {
                         return getWarConvention(project).getWebAppDir();
                     }
                 });
             }
         });
 
-        JettyRun jettyRun = project.getTasks().add(JETTY_RUN, JettyRun.class);
+        JettyRun jettyRun = project.getTasks().create(JETTY_RUN, JettyRun.class);
         jettyRun.setDescription("Uses your files as and where they are and deploys them to Jetty.");
         jettyRun.setGroup(WarPlugin.WEB_APP_GROUP);
     }
@@ -141,23 +134,23 @@ public class Jetty7Plugin implements Plugin<Project> {
         jettyTask.setDaemon(false);
         jettyTask.setReload(RELOAD_AUTOMATIC);
         jettyTask.setScanIntervalSeconds(0);
-        jettyTask.getConventionMapping().map("contextPath", new ConventionValue() {
-            public Object getValue(Convention convention, IConventionAware conventionAwareObject) {
+        jettyTask.getConventionMapping().map("contextPath", new Callable<Object>() {
+            public Object call() throws Exception {
                 return ((War) project.getTasks().getByName(WarPlugin.WAR_TASK_NAME)).getBaseName();
             }
         });
-        jettyTask.getConventionMapping().map("httpPort", new ConventionValue() {
-            public Object getValue(Convention convention, IConventionAware conventionAwareObject) {
+        jettyTask.getConventionMapping().map("httpPort", new Callable<Object>() {
+            public Object call() throws Exception {
                 return jettyConvention.getHttpPort();
             }
         });
-        jettyTask.getConventionMapping().map("stopPort", new ConventionValue() {
-            public Object getValue(Convention convention, IConventionAware conventionAwareObject) {
+        jettyTask.getConventionMapping().map("stopPort", new Callable<Object>() {
+            public Object call() throws Exception {
                 return jettyConvention.getStopPort();
             }
         });
-        jettyTask.getConventionMapping().map("stopKey", new ConventionValue() {
-            public Object getValue(Convention convention, IConventionAware conventionAwareObject) {
+        jettyTask.getConventionMapping().map("stopKey", new Callable<Object>() {
+            public Object call() throws Exception {
                 return jettyConvention.getStopKey();
             }
         });

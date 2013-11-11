@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.veil.gradle.plugins.jetty7;
+package org.veil.gradle.plugins.jetty9;
 
 /**
  * Convention properties and methods added by the {@link org.gradle.api.plugins.jetty.JettyPlugin}.
- *
- * @author Hans Dockter
  */
 public class JettyPluginConvention {
     private Integer stopPort;

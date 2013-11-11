@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package org.veil.gradle.plugins.jetty7;
+package org.veil.gradle.plugins.jetty9;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.veil.gradle.plugins.jetty7.internal.Jetty7PluginServer;
-import org.veil.gradle.plugins.jetty7.internal.JettyPluginServer;
+import org.veil.gradle.plugins.jetty9.internal.Jetty9PluginServer;
+import org.veil.gradle.plugins.jetty9.internal.JettyPluginServer;
 import org.eclipse.jetty.util.Scanner;
 import org.eclipse.jetty.xml.XmlConfiguration;
 import org.gradle.api.tasks.InputFile;
@@ -45,7 +45,6 @@ public class JettyRunWar extends AbstractJettyRunTask {
         super.configureWebApplication();
 
         getWebAppConfig().setWar(getWebApp().getCanonicalPath());
-//        getWebAppConfig().configure();
     }
 
     public void validateConfiguration() {
@@ -60,7 +59,7 @@ public class JettyRunWar extends AbstractJettyRunTask {
         scanList.add(getWebApp());
         getScanner().setScanDirs(scanList);
 
-        ArrayList listeners = new ArrayList();
+        List<Scanner.Listener> listeners = new ArrayList<Scanner.Listener>();
         listeners.add(new Scanner.BulkListener() {
             public void filesChanged(List changes) {
                 try {
@@ -123,6 +122,6 @@ public class JettyRunWar extends AbstractJettyRunTask {
     }
 
     public JettyPluginServer createServer() throws Exception {
-        return new Jetty7PluginServer();
+        return new Jetty9PluginServer();
     }
 }

@@ -3,12 +3,12 @@ apply plugin: 'idea'
 apply from: "$rootDir/gradle/maven-deployment.gradle"
 
 group = 'org.veil.gradle.plugins'
-projectName = 'jetty7-gradle-plugin'
-version = '1.0.7.3.0'
-jettyVersion = "7.3.0.v20110203"
+def projectName = 'jetty9-gradle-plugin'
+version = '1.0.9.0.5'
+def jettyVersion = '9.0.5.v20130815'
 
 repositories {
-	mavenRepo urls: "http://repo.kulya.info/content/groups/public/"
+	maven { url: 'http://repo.kulya.info/content/groups/public' }
 }
 
 dependencies {
@@ -18,7 +18,8 @@ dependencies {
 		"org.eclipse.jetty:jetty-annotations:${jettyVersion}",
 		"org.eclipse.jetty:jetty-security:${jettyVersion}"
 	
-	groovy localGroovy()
+	compile localGroovy()
 	
 	testCompile "junit:junit:4.9"
+	testCompile 'org.hamcrest:hamcrest-library:1.3'
 }
