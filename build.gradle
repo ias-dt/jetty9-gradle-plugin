@@ -8,7 +8,7 @@ version = '1.0.9.0.5'
 def jettyVersion = '9.0.5.v20130815'
 
 repositories {
-	maven { url: 'http://repo.kulya.info/content/groups/public' }
+	maven { url 'http://repo.kulya.info/content/groups/public' }
 }
 
 dependencies {
